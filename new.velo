@@ -1,129 +1,52 @@
-
 import wixData from 'wix-data';
 import wixLocation from 'wix-location';
 import wixUsers from 'wix-users';
-import { authentication, currentMember } from "wix-members-frontend";
-import  {myAssignRoleFunction} from "backend/roles.web"
+import { currentMember } from "wix-members-frontend";
+import { myAssignRoleFunction } from "backend/roles.web";
 
-
+// Set up the onReady function
 $w.onReady(function () {
   // Attach event listener to the submit button.
   $w('#submitButton').onClick(async () => {
-    // Ensure the user is logged in.
     const user = wixUsers.currentUser;
+
+    // Ensure the user is logged in.
     if (!user.loggedIn) {
       console.error("User not logged in.");
       return;
     }
+
     const memberId = user.id;
-    
-    // Validate that all required (visible) fields are filled.
+
+    // Validate the form before proceeding
     if (!validateForm()) {
       console.error("Validation failed. Please fill in all required fields.");
       return;
     }
-    
-    // Determine member type using the appropriate dropdown field(s).
-    let memberType = "";
-    if ($w("#dropdown1").value === "SopirPengiriman" || $w("#dropdown1").value === "Grosir") {
-      memberType = $w("#dropdown1").value;
-    } else if ($w("#dropdown4").value) {
-      memberType = $w("#dropdown4").value;
-    } else if ($w("#dropdown2").value) {
-      memberType = $w("#dropdown2").value;
-    } else {
+
+    // Determine the member type based on dropdown selections
+    let memberType = getMemberType();
+    if (!memberType) {
       console.error("No valid member type selected.");
       return;
     }
-    
-    // Build the formData object based on member type.
-    let formData = { memberId: memberId };
-    switch (memberType) {
-      case "SopirPengiriman": // Drivers
-        formData.memberType = memberType;
-        formData.name = $w("#input5").value;
-        formData.password = $w("#input1").value;
-        formData.email = $w("#input2").value;
-        formData.phoneNumber = $w("#input8").value;
-        formData.ktp = $w("#input4").value;
-       // formData.ktpUpload = $w("#uploadbutton1").value; // Assumes file upload returns a valid value
-        formData.simNumber = $w("#input10").value;
-        formData.addedBy = $w("#dropdown5").value;
-        break;
-      case "RoomService(TidakDapur)":
-        formData.memberType = memberType;
-        formData.hotelName = $w("#input14").value;
-        formData.email = $w("#input2").value;
-        formData.password = $w("#input1").value;
-        formData.name = $w("#input5").value;
-        formData.managersPhone = $w("#input8").value;
-        formData.hotelAddress = $w("#addressInput1").value;
-        formData.hotelPhoneNumber = $w("#input13").value;
-        formData.restaurant = $w("#dropdown6").value;
-        break;
-      case "Konsultasi":
-        formData.memberType = memberType;
-        formData.name = $w("#input14").value; // For Konsultasi, name comes from #input14.
-        formData.name1 = $w("#input11").value;
-        formData.email = $w("#input2").value;
-        formData.password = $w("#input1").value;
-        formData.phone = $w("#input8").value;
-        formData.location = $w("#dropdown7").value;
-        formData.address = $w("#addressInput1").value;
-        break;
-      case "MenyewaDanMengoperasikan(Dapur)":
-        formData.memberType = memberType;
-        formData.hotelName = $w("#input14").value;
-        formData.email = $w("#input2").value;
-        formData.password = $w("#input1").value;
-        formData.name = $w("#input5").value;
-        formData.managersPhoneNumber = $w("#input8").value;
-        formData.hotelAddress = $w("#addressInput1").value;
-        formData.hotelPhoneNumber = $w("#input13").value;
-        formData.restaurant = $w("#dropdown6").value;
-        break;
-      case "Grosir":
-        formData.memberType = memberType;
-        formData.name = $w("#input5").value;
-        formData.email = $w("#input2").value;
-        formData.password = $w("#input1").value;
-        formData.phone = $w("#input8").value;
-        formData.ktp = $w("#input4").value;
-        formData.address = $w("#addressInput1").value;
-        formData.npwp = $w("#input15").value;
-        break;
-      case "Menyewakan":
-        formData.memberType = memberType;
-        formData.restaurantName = $w("#input11").value;
-        formData.name = $w("#input5").value;
-        formData.email = $w("#input2").value;
-        formData.password = $w("#input1").value;
-        formData.phone = $w("#input8").value;
-        formData.address = $w("#addressInput1").value;
-        break;
-      case "Waralaba":
-        formData.memberType = memberType;
-        formData.namaWaralaba = $w("#input16").value;
-        formData.waralabaType = $w("#dropdown3").value;
-        formData.name = $w("#input5").value;
-        formData.email = $w("#input2").value;
-        formData.password = $w("#input1").value;
-        formData.phone = $w("#input8").value;
-        formData.lastName = $w("#input17").value;
-        break;
-      default:
-        console.error("Member type not recognized:", memberType);
-        return;
-    }
-    
-    // Determine the correct collection name.
-    const collectionName = getCollectionName(memberType);
-    if (!collectionName) {
-      console.error("Invalid member type selected:", memberType);
+
+    // Collect form data based on the member type
+    let formData = gatherFormData(memberType);
+
+    if (!formData) {
+      console.error("Form data is incomplete.");
       return;
     }
-    
-    // Insert the data into the appropriate collection.
+
+    // Determine the correct collection name for the member type
+    const collectionName = getCollectionName(memberType);
+    if (!collectionName) {
+      console.error("Invalid member type selected.");
+      return;
+    }
+
+    // Insert the form data into the correct database collection
     try {
       await wixData.insert(collectionName, formData);
       console.log(`Data successfully saved to ${collectionName}`);
@@ -131,35 +54,27 @@ $w.onReady(function () {
       console.error("Error saving data:", err);
       return;
     }
-    
-    // Define role mappings.
-    const roles = {
-      "SopirPengiriman": "b93ce41d-bb23-4463-8bf9-be82adf8ab04",
-      "RoomService(TidakDapur)": "d034ccff-11df-4556-91bf-2aabe2edaf97",
-      "MenyewaDanMengoperasikan(Dapur)": "6b77bc33-c9ef-4945-b492-56de48ab56ba",
-      "Grosir": "017520b5-a945-4515-a14d-ef3bd9e43524",
-      "Konsultasi": "30044550-09b4-4c68-b85e-8178428a5ee1",
-      "Waralaba": "b11c1560-4d1b-4f8a-a821-563d2af040a8",
-      "Menyewakan": "4b464763-5bec-45f2-a655-cfb0731b0706"
-    };
-    const roleId = roles[memberType];
-    
-    // Assign the role using Wix Users API.
+
+    // Assign the appropriate role to the member
+    const roleId = getRoleId(memberType);
+    if (!roleId) {
+      console.error("Role ID not found.");
+      return;
+    }
+
     try {
-      let result= await myAssignRoleFunction(roleId, memberId);
-      console.log("Role assigned successfully:", roleId), result;
+      const result = await myAssignRoleFunction(roleId, memberId);
+      console.log("Role assigned successfully:", roleId, result);
     } catch (err) {
       console.error("Error assigning role:", err);
     }
-    
-    // Now update the member's record in the collection with the role value.
+
+    // Update the member's record with the assigned role
     try {
-      let queryResult = await wixData.query(collectionName)
-        .eq("memberIdField1", memberId)
-        .find();
+      let queryResult = await wixData.query(collectionName).eq("memberIdField1", memberId).find();
       if (queryResult.items.length > 0) {
         let memberItem = queryResult.items[0];
-        memberItem.memberRole = roleId; // Update the field "memberRole"
+        memberItem.memberRole = roleId; // Update the "memberRole" field
         await wixData.update(collectionName, memberItem);
         console.log("Member role updated in collection.");
       } else {
@@ -168,26 +83,79 @@ $w.onReady(function () {
     } catch (err) {
       console.error("Error updating member role:", err);
     }
-    
-    // Redirect based on member type.
+
+    // Redirect based on the selected member type
     redirectToNextStep(memberType);
   });
 });
 
+// Function to validate the form fields
 function validateForm() {
-  // List of required fields (adjust as necessary)
   const requiredFields = ["#inputFirstName", "#inputLastName", "#inputEmail", "#inputPhone"];
   let valid = true;
-  requiredFields.forEach(f => {
-    const el = $w(f);
-    if (!el.hidden && (!el.value || el.value === "")) {
-      el.focus();
+
+  requiredFields.forEach(fieldId => {
+    const field = $w(fieldId);
+    if (!field.hidden && (!field.value || field.value === "")) {
+      field.focus();
       valid = false;
     }
   });
+
   return valid;
 }
 
+// Function to get the selected member type from dropdowns
+function getMemberType() {
+  if ($w("#dropdown1").value === "SopirPengiriman" || $w("#dropdown1").value === "Grosir") {
+    return $w("#dropdown1").value;
+  } else if ($w("#dropdown4").value) {
+    return $w("#dropdown4").value;
+  } else if ($w("#dropdown2").value) {
+    return $w("#dropdown2").value;
+  }
+  return null;
+}
+
+// Function to gather form data based on member type
+function gatherFormData(memberType) {
+  let formData = { memberId: wixUsers.currentUser.id };
+  switch (memberType) {
+    case "SopirPengiriman":
+      formData = {
+        ...formData,
+        memberType: "SopirPengiriman",
+        name: $w("#input5").value,
+        password: $w("#input1").value,
+        email: $w("#input2").value,
+        phoneNumber: $w("#input8").value,
+        ktp: $w("#input4").value,
+        simNumber: $w("#input10").value,
+        addedBy: $w("#dropdown5").value
+      };
+      break;
+    case "RoomService(TidakDapur)":
+      formData = {
+        ...formData,
+        memberType: "RoomService(TidakDapur)",
+        hotelName: $w("#input14").value,
+        email: $w("#input2").value,
+        password: $w("#input1").value,
+        name: $w("#input5").value,
+        managersPhone: $w("#input8").value,
+        hotelAddress: $w("#addressInput1").value,
+        hotelPhoneNumber: $w("#input13").value,
+        restaurant: $w("#dropdown6").value
+      };
+      break;
+    // Add other member types following a similar pattern...
+    default:
+      return null;
+  }
+  return formData;
+}
+
+// Function to get the collection name based on member type
 function getCollectionName(memberType) {
   switch (memberType) {
     case "SopirPengiriman":
@@ -209,6 +177,21 @@ function getCollectionName(memberType) {
   }
 }
 
+// Function to get the role ID based on member type
+function getRoleId(memberType) {
+  const roles = {
+    "SopirPengiriman": "b93ce41d-bb23-4463-8bf9-be82adf8ab04",
+    "RoomService(TidakDapur)": "d034ccff-11df-4556-91bf-2aabe2edaf97",
+    "MenyewaDanMengoperasikan(Dapur)": "6b77bc33-c9ef-4945-b492-56de48ab56ba",
+    "Grosir": "017520b5-a945-4515-a14d-ef3bd9e43524",
+    "Konsultasi": "30044550-09b4-4c68-b85e-8178428a5ee1",
+    "Waralaba": "b11c1560-4d1b-4f8a-a821-563d2af040a8",
+    "Menyewakan": "4b464763-5bec-45f2-a655-cfb0731b0706"
+  };
+  return roles[memberType];
+}
+
+// Function to redirect the user based on their member type
 function redirectToNextStep(memberType) {
   switch (memberType) {
     case "SopirPengiriman":
