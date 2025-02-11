@@ -4,7 +4,8 @@
 
 import wixLocation from 'wix-location';
 import wixUsers from 'wix-users';
-import { getDashboardURL } from 'backend/data';
+import wixData from 'wix-data';
+import { getDashboardURL } from 'backend/bookingUtils.js';
 
 $w.onReady(async function () {
     let user = wixUsers.currentUser;

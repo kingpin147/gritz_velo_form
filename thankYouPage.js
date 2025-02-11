@@ -1,67 +1,57 @@
-// Frontend Code for the Thank You Page (Post-Booking Redirect)
-// File: (e.g., Section4_BookingConfirmationRedirect.js)
-// Place this code in your thank-you page's Page Code panel.
-
-import wixUsers from 'wix-users';
-import wixBookings from 'wix-bookings';
 import wixLocation from 'wix-location';
-import { getMemberType, getDashboardURL } from 'backend/bookingUtils';
+import { getDashboardURL } from 'backend/bookingUtils';
+import { currentMember } from "wix-members-frontend";
+
+async function myGetRolesFunction() {
+    try {
+        const roles = await currentMember.getRoles();
+        return roles.length > 0 ? roles[0].title : null;
+    } catch (err) {
+        console.error("Error fetching roles:", err);
+        return null;
+    }
+}
+
+// Function to get the member type from the collection name
+function getMemberType(collectionName) {
+    const mapping = {
+        "Drivers": "SopirPengiriman",
+        "RoomService": "RoomService(TidakDapur)",
+        "Consultation": "Konsultasi",
+        "RentAndOperate": "MenyewaDanMengoperasikan(Dapur)",
+        "Wholesale": "Grosir",
+        "RentalInformation": "Menyewakan",
+        "Franchise": "Waralaba"
+    };
+    return mapping[collectionName] || null;
+}
 
 $w.onReady(async function () {
-  // Ensure the user is logged in.
-  const user = wixUsers.currentUser;
-  if (!user.loggedIn) {
-    wixLocation.to("/login");
-    return;
-  }
-  const userId = user.id;
-  
-  // Check if the current user has any confirmed bookings.
-  const isConfirmed = await confirmBooking();
-  
-  if (isConfirmed) {
-    // Retrieve the member type from the backend.
-    const memberType = await getMemberType(userId);
-    if (!memberType) {
-      displayError("Unable to retrieve your member type. Please contact support.");
-      return;
+    try {
+        const collectionName = await myGetRolesFunction();
+        if (!collectionName) {
+            console.error("Failed to retrieve roles.");
+            return;
+        }
+
+        const memberType = getMemberType(collectionName);
+        if (!memberType) {
+            console.error("Member type not found for collection:", collectionName);
+            return;
+        }
+
+        const dashboardURL = getDashboardURL(memberType);
+        if (!dashboardURL) {
+            console.error("Dashboard URL not found for member type:", memberType);
+            return;
+        }
+
+        // Wait for 3 seconds before redirecting
+        setTimeout(() => {
+            wixLocation.to(dashboardURL);
+        }, 3000);
+
+    } catch (error) {
+        console.error("Error handling booking confirmation:", error);
     }
-    // Get the dashboard URL based on the member type.
-    const dashboardURL = getDashboardURL(memberType);
-    if (!dashboardURL) {
-      displayError("Dashboard URL not found for your member type. Please contact support.");
-      return;
-    }
-    // Redirect the user to their dashboard.
-    wixLocation.to(dashboardURL);
-  } else {
-    // If no confirmed booking, display an error message.
-    displayError("Your booking is not confirmed yet. Please check your email or contact support for assistance.");
-  }
 });
-
-/**
- * Checks if the current user has any bookings with status "CONFIRMED"
- * using the standard Wix Bookings API.
- * @returns {Promise<boolean>} True if at least one confirmed booking exists.
- */
-async function confirmBooking() {
-  try {
-    const bookings = await wixBookings.getMyBookings();
-    // Assuming the confirmed status is "CONFIRMED"
-    return bookings.some(booking => booking.status === "CONFIRMED");
-  } catch (error) {
-    console.error("Error retrieving bookings:", error);
-    return false;
-  }
-}
-
-/**
- * Displays an error message on the page.
- * Assumes there is a text element with ID "#errorMessage" (initially hidden).
- * @param {string} message - The error message to display.
- */
-function displayError(message) {
-  $w("#errorMessage").text = message;
-  $w("#errorMessage").show();
-}

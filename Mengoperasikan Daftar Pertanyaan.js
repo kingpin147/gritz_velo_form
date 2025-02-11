@@ -8,12 +8,14 @@ $w.onReady(async function () {
   if (!user.loggedIn) return;
   const userId = user.id;
   
+  // Retrieve the member type.
   const memberType = await getMemberType(userId);
   if (memberType !== "MenyewaDanMengoperasikan(Dapur)") {
     console.error("This page is for MenyewaDanMengoperasikan members only.");
     return;
   }
-  $w("#memberIdField1").value = userId;
+  
+  $w("#memberIdField").value = userId;
 
   $w("#submitButton").onClick(async function () {
     if (!validateForm()) return;
@@ -30,7 +32,7 @@ async function getMemberType(userId) {
       .find();
     return result.items.length > 0 ? result.items[0].memberType : null;
   } catch (e) {
-    console.error(e);
+    console.error("Error fetching member type:", e);
     return null;
   }
 }
@@ -40,9 +42,9 @@ function collectFormData() {
   data.numberOfRooms = $w("#input1").value;
   data.atmosphere = $w("#input3").value;
   data.diningArea = $w("#input4").value;
-  data.dinnerSet = $w("#input5").value;
+  data.dinnerSet = $w("#input2").value;
   data.demonstration = concatenateValues(["#input2", "#checkboxGroup1", "#checkboxGroup2"]);
-  data.kitchenSize = $w("#inout7").value;
+  data.kitchenSize = $w("#input7").value;
   data.stillOperational = $w("#input8").value;
   data.remainingStaff = $w("#input9").value;
   data.kitchenEquipment = concatenateValues(["#checkboxGroup3"]);
@@ -81,6 +83,10 @@ function validateForm() {
 
 async function updateMemberData(memberType, userId, formData) {
   const col = getCollectionName(memberType);
+  if (!col) {
+    console.error("Invalid collection name.");
+    return;
+  }
   try {
     const result = await wixData.query(col)
       .eq("memberIdField1", userId)
@@ -93,8 +99,7 @@ async function updateMemberData(memberType, userId, formData) {
       console.error("Member item not found in", col);
     }
   } catch (e) {
-    console.error(e);
-    throw e;
+    console.error("Error updating member data:", e);
   }
 }
 

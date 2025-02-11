@@ -1,31 +1,42 @@
-// Section 8: Dynamic Homepage Redirection Based on Role - Frontend Code
-// This code runs on your Home Page (or Master Page) to redirect a logged-in user to their dashboard.
-
 import wixUsers from 'wix-users';
 import wixLocation from 'wix-location';
-import { getUserRole, getDashboardURL } from 'backend/roles';
+import { myGetRolesFunction, getDashboardURL } from 'backend/roles';
 
 $w.onReady(async function () {
-    // Check if the user is logged in.
+    // Ensure the user is logged in before proceeding.
     const user = wixUsers.currentUser;
-    if (!user.loggedIn) return;  // No redirection for not logged in users.
-    
+    if (!user.loggedIn) {
+        console.warn("User is not logged in. Redirecting to login page...");
+        wixLocation.to("/login");  // Redirect to login page if not logged in
+        return;
+    }
+
     const userId = user.id;
-    // Retrieve the user's role from the Members collection.
-    const memberRole = await getUserRole(userId);
-    if (!memberRole) {
-        console.error("User role not found for user:", userId);
-        return;
+
+    try {
+        // Retrieve the user's role from the Members collection.
+        const memberRole = await myGetRolesFunction();
+        if (!memberRole) {
+            console.error("User role not found for user:", userId);
+            return;
+        }
+
+        // Get the corresponding dashboard URL.
+        const dashboardURL = getDashboardURL(memberRole);
+        if (!dashboardURL) {
+            console.error("Dashboard URL not defined for role:", memberRole);
+            return;
+        }
+
+        // Prevent redirect loop: Check if the user is already on the dashboard.
+        if (wixLocation.url === dashboardURL) {
+            console.log("User is already on the correct dashboard:", dashboardURL);
+            return;
+        }
+
+        // Redirect to the user's dashboard.
+        wixLocation.to(dashboardURL);
+    } catch (error) {
+        console.error("Error fetching user role or dashboard:", error);
     }
-    
-    // Map the member role to the correct dashboard URL.
-    const dashboardURL = getDashboardURL(memberRole);
-    if (!dashboardURL) {
-        console.error("Dashboard URL not defined for role:", memberRole);
-        return;
-    }
-    
-    // Optionally, prevent redirect loop by checking if the current URL is already the dashboard.
-    // For simplicity, we redirect directly:
-    wixLocation.to(dashboardURL);
 });

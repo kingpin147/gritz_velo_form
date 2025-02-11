@@ -13,6 +13,7 @@ $w.onReady(async function () {
     console.error("This page is for Konsultasi members only.");
     return;
   }
+  
   $w("#memberIdField1").value = userId;
 
   $w("#submitButton").onClick(async function () {
@@ -30,7 +31,7 @@ async function getMemberType(userId) {
       .find();
     return result.items.length > 0 ? result.items[0].memberType : null;
   } catch (e) {
-    console.error(e);
+    console.error("Error fetching member type:", e);
     return null;
   }
 }
@@ -75,6 +76,10 @@ function validateForm() {
 
 async function updateMemberData(memberType, userId, formData) {
   const col = getCollectionName(memberType);
+  if (!col) {
+    console.error("Invalid collection name.");
+    return;
+  }
   try {
     const result = await wixData.query(col)
       .eq("memberIdField1", userId)
@@ -87,8 +92,7 @@ async function updateMemberData(memberType, userId, formData) {
       console.error("Member item not found in", col);
     }
   } catch (e) {
-    console.error(e);
-    throw e;
+    console.error("Error updating member data:", e);
   }
 }
 
