@@ -1,32 +1,107 @@
+// roles.web.js
 import { Permissions, webMethod } from "wix-web-module";
-import { authorization, currentMember } from "wix-members-backend";
+import { authorization, currentMember, badges } from "wix-members-backend";
 
-// Ensure the method is available and exposed
-export const myAssignRoleFunction = webMethod(Permissions.Anyone, (roleId, memberId) => {
-  const options = { suppressAuth: false };
+// Assign the role to the member. If the assignment fails, throw an error.
+export const myAssignRoleFunction = webMethod(Permissions.Anyone, async (roleId, memberId) => {
+    // Validate input parameters.
+    if (!roleId || !memberId) {
+        throw new Error("Role ID and Member ID are required.");
+    }
 
-  return authorization.assignRole(roleId, memberId, options)
-    .then(() => {
-      console.log("Role assigned successfully to member", memberId);
-    })
-    .catch((error) => {
-      console.error("Error assigning role:", error);
-    });
+    const options = { suppressAuth: true };
+
+    try {
+        const result = await authorization.assignRole(roleId, memberId, options);
+        console.log("Role assigned successfully to member", memberId);
+        return result;
+    } catch (error) {
+        console.error("Error assigning role:", error);
+        throw error; // rethrow error so that the client can handle it
+    }
+});
+
+export const myAssignMembersFunction = webMethod(Permissions.Anyone, async (badgeId, memberId) => {
+    try {
+        const memberIds = [memberId,];
+
+        const assignedMembers = await badges.assignMembers(badgeId, memberIds);
+
+        console.log("Role assigned successfully to member:", memberIds);
+
+        return assignedMembers;
+    } catch (error) {
+        console.error("Error assigning badge:", error);
+        return { success: false, message: "Failed to assign badge", error };
+    }
 });
 
 
-export const myGetRolesFunction = webMethod(Permissions.Anyone, () => {
-  return currentMember
-    .getRoles()
-    .then((roles) => {
-      return roles;
-    })
-    .catch((error) => {
-      console.error(error);
-    });
+
+
+
+//below testing functios no use in actual site functionality 
+
+// Optionally, you can update the other backend functions similarly.
+export const myGetRolesFunction = webMethod(Permissions.Anyone, async () => {
+    try {
+        const roles = await currentMember.getRoles();
+        return roles;
+    } catch (error) {
+        console.error(error);
+        throw error;
+    }
 });
 
 import { members } from "wix-members-backend";
+
+export const myGetMemberFunction = webMethod(
+    Permissions.Anyone,
+    async (id, options) => {
+        try {
+            return members
+                .getMember(id, options)
+                .then((member) => {
+                    const slug = member.profile.slug;
+                    console.log(slug);
+                    const name = `${member.contactDetails.firstName} ${member.contactDetails.lastName}`;
+                    console.log(name);
+                    const contactId = member.contactId;
+                    console.log(contactId);
+                    return member;
+                })
+                .catch((error) => {
+                    console.error(error);
+                });
+        } catch (error) {
+            console.error(error);
+            throw error;
+        }
+    }
+);
+
+export const myListMembersFunction = webMethod(Permissions.Anyone, () => {
+    const badgeId = "6b77bc33-c9ef-4945-b492-56de48ab56ba";
+
+    return badges
+        .listMembers(badgeId)
+        .then((memberIds) => {
+            const firstMember = memberIds[0];
+            return memberIds;
+        })
+        .catch((error) => {
+            console.error(error);
+        });
+});
+
+/*
+ * Promise resolves to:
+ * [
+ *   "28d35f86-6694-4455-9dff-aff5d450b482",
+ *   "72751428-2743-4bda-acf5-4218a4279cd3",
+ *   "8831eed6-928e-4f85-b80a-e1e48fb7c4fd"
+ * ]
+ */
 
 // Sample id value:
 // '60a91ab6-5e30-4af2-9d5e-a205c351ffd7'
@@ -35,60 +110,3 @@ import { members } from "wix-members-backend";
 // {
 //   fieldsets: [ 'FULL' ]
 // }
-
-export const myGetMemberFunction = webMethod(
-  Permissions.Anyone,
-  (id, options) => {
-    return members
-      .getMember(id, options)
-      .then((member) => {
-        // const slug = member.profile.slug;
-        // const name = `${member.contactDetails.firstName} ${member.contactDetails.lastName}`;
-        // const contactId = member.contactId;
-        return member;
-      })
-      .catch((error) => {
-        console.error(error);
-      });
-  },
-);
-
-/* Promise resolves to:
- * {
- *   "_id": "f32cbc51-a331-442b-86c2-2c664613e8b9",
- *   "_createdDate": "2021-08-02T23:14:42.000Z",
- *   "_updatedDate": "2021-08-02T23:14:58.345Z",
- *   "lastLoginDate": "2021-08-02T23:17:29.000Z",
- *   "loginEmail": "claude.morales@example.com",
- *   "status": "APPROVED",
- *   "contactId": "f32cbc51-a331-442b-86c2-2c664613e8b9",
- *   "privacyStatus": "PUBLIC",
- *   "activityStatus": "ACTIVE",
- *   "contactDetails": {
- *     "firstName": "Claude",
- *     "lastName": "Morales",
- *     "phones": [
- *       "0747-769-460"
- *     ],
- *     "emails": [
- *       "claude.morales@example.com"
- *     ],
- *     "addresses": [
- *       {
- * "_id": "e151960c-04a7-43ef-aa17-a134916ded07",
- * "addressLine": "9373 Park Avenue",
- * "addressLine2": "Berkshire",
- * "city": "Ely",
- * "subdivision": "GB-ENG",
- * "country": "GB",
- * "postalCode": "PD50 8EU"
- *       }
- *     ],
- *     "customFields": {}
- *   },
- *   "profile": {
- *     "nickname": "claude.morales",
- *     "slug": "claudemorales"
- *   }
- * }
- */
